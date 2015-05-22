@@ -1,9 +1,10 @@
 package com.cloudinary
 
+import scala.language.postfixOps
 import org.scalatest._
-import org.scalatest.matchers.ShouldMatchers
+import org.scalatest.Matchers
 
-class TransformationSpec extends FlatSpec with ShouldMatchers with OptionValues with Inside {
+class TransformationSpec extends FlatSpec with Matchers with OptionValues with Inside {
   behavior of "A Transformation"
 
   lazy val cloudinary = {
@@ -23,10 +24,17 @@ class TransformationSpec extends FlatSpec with ShouldMatchers with OptionValues 
   }
   
   it should "support angle" in {
-    cloudinary.url().transformation(Transformation().a_("12")).generate("test") should equal(
+    cloudinary.url().transformation(Transformation().a_(12)).generate("test") should equal(
       "http://res.cloudinary.com/test123/image/upload/a_12/test")
     cloudinary.url().transformation(Transformation().a_("exif", "12")).generate("test") should equal(
       "http://res.cloudinary.com/test123/image/upload/a_exif.12/test")
+  }
+
+  it should "support opacity" in {
+    cloudinary.url().transformation(Transformation().o_(23)).generate("test") should equal(
+      "http://res.cloudinary.com/test123/image/upload/o_23/test")
+    cloudinary.url().transformation(Transformation().opacity(77)).generate("test") should equal(
+      "http://res.cloudinary.com/test123/image/upload/o_77/test")
   }
   
   it should "support overlay" in {

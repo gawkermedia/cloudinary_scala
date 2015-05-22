@@ -5,9 +5,11 @@ import org.json4s._
 import org.json4s.DefaultFormats
 import org.json4s.ext.EnumNameSerializer
 import com.cloudinary.Transformation
+import com.cloudinary.parameters._
 import java.text.SimpleDateFormat
 
 case class FaceInfo(x: Int, y: Int, width: Int, height: Int)
+case class CustomCoordinate(x: Int, y: Int, width: Int, height: Int)
 case class EagerInfo(url: String, secure_url: String)
 case class ColorInfo(color: String, rank: Double)
 case class SpriteImageInfo(x: Int, y: Int, width: Int, height: Int)
@@ -15,6 +17,10 @@ case class UsageInfo(usage: Int, limit: Int, used_percent: Float)
 case class DerivedInfo(public_id: String, format: String, bytes: Long, id: String, url: String, secure_url: String)
 case class DerivedTransformInfo(transformation: String, format: String, bytes: Long, id: String, url: String, secure_url: String)
 case class TransformationInfo(name: String, allowed_for_strict: Boolean, used: Boolean)
+case class UploadPreset(name:String = null, unsigned:Boolean = false, settings:UploadParameters) {
+  def toMap = settings.toMap + ("name" -> name) + ("unsigned" -> unsigned.toString())
+}
+case class UnparsedUploadPreset(name:String, unsigned:Boolean, settings:Map[String,String])
 
 object ModerationStatus extends Enumeration {
   type ModerationStatus = Value
@@ -31,7 +37,7 @@ case class UploadResponse(public_id: String, url: String, secure_url: String, si
   def format:String = (raw \ "format").extractOpt[String].getOrElse(null)
 }
 case class LargeRawUploadResponse(public_id: String, url: String, secure_url: String, signature: String, bytes: Long,
-  resource_type: String, upload_id:Option[String], done:Option[Boolean]) extends VersionedResponse with TimestampedResponse
+  resource_type: String, tags: List[String] = List(), upload_id:Option[String], done:Option[Boolean]) extends VersionedResponse with TimestampedResponse
 case class DestroyResponse(result: String) extends RawResponse
 case class ExplicitResponse(public_id: String, version: String, url: String, secure_url: String, signature: String, bytes: Long,
   format: String, eager: List[EagerInfo] = List(), `type`: String) extends RawResponse
@@ -72,20 +78,37 @@ case class ResourcesResponse(next_cursor: Option[String]) extends RawResponse {
 case class DeleteResourceResponse(deleted: Map[String, String], next_cursor: Option[String]) extends RawResponse
 case class TransformationsResponse(transformations: List[TransformationInfo], next_cursor: Option[String]) extends RawResponse
 case class TransformationResponse(name: String, allowed_for_strict: Boolean, used: Boolean, derived: List[DerivedInfo]) extends RawResponse {
-  def info =
-    Transformation(for {
-      JArray(l) <- raw \ "info"
-    } yield {
-      (for {
-        JObject(o) <- l
-        (key, value) <- o
-      } yield {
-        key -> value.values
-      }).toMap
-    })
+  def info = parseTrasnsormation(raw \ "info")
 }
 case class TransformationUpdateResponse(message: String)
+
+case class UploadPresetsResponse(presets: List[UnparsedUploadPreset], next_cursor: Option[String]) extends RawResponse
+class UploadPresetResponse extends RawResponse {
+  implicit val formats = DefaultFormats
+  lazy val preset = 
+  UploadPreset(
+    (raw \ "name").extract[String], 
+    (raw \ "unsigned").extract[Boolean], 
+    UploadParameters(raw \ "settings" match {
+      case JObject(values) => values.collect{
+          case ("face_coordinates", value:JObject) => "face_coordinates" -> FacesInfo(value.extract[List[FaceInfo]])
+          case ("transformation", v:JValue) => "transformation" -> parseTrasnsormation(v)
+          case ("eager", JArray(transformations)) => "eager" -> transformations.map(parseTrasnsormation)
+          case ("context", value:JObject) => "context" -> ContextMap(value.extract[Map[String, String]])
+          case ("headers", value:JObject) => "headers" -> HeaderMap(value.extract[Map[String, String]])
+          case (key, JArray(value)) => key -> StringSet(value.map{jv => jv.extract[String]}.toSet)
+          case (key, value:JValue) => key -> value.values
+        }.toMap
+      case  _ => Map()
+    }))
+}
+case class UploadPresetUpdateResponse(message: String)
+case class UploadPresetCreateResponse(message: String, name:String)
+
 case class TagsResponse(tags: List[String], next_cursor: Option[String]) extends RawResponse
+
+case class FolderInfo(name:String, path:String)
+case class FolderListResponse(folders: List[FolderInfo])
 
 //Shared
 case class ResourceResponse(public_id: String, url: String, secure_url: String, bytes: Int,
@@ -96,6 +119,18 @@ trait RawResponse {
   private var rawJson: JsonAST.JValue = null
   private[cloudinary] def raw_=(json: JsonAST.JValue) = rawJson = json
   def raw = rawJson
+
+  protected def parseTrasnsormation(t:JValue) = 
+    Transformation(for {
+        JArray(l) <- t
+      } yield {
+        (for {
+          JObject(o) <- l
+          (key, value) <- o
+        } yield {
+          key -> value.values
+        }).toMap
+      })
 }
 
 trait VersionedResponse extends RawResponse {
@@ -155,6 +190,11 @@ trait AdvancedResponse extends RawResponse {
     JArray(JInt(x) :: JInt(y) :: JInt(width) :: JInt(height) :: Nil) <- l
   } yield FaceInfo(x.toInt, y.toInt, width.toInt, height.toInt)
 
+  lazy val customCoordinates: List[CustomCoordinate] = for {
+    JArray(l) <- raw \ "coordinates" \ "custom"
+    JArray(JInt(x) :: JInt(y) :: JInt(width) :: JInt(height) :: Nil) <- l
+  } yield CustomCoordinate(x.toInt, y.toInt, width.toInt, height.toInt)
+
   lazy val context: Map[String, Map[String, String]] = (raw \ "context") match {
     case JObject(v) =>
       v.collect({ case (k, JObject(v)) => k -> v.collect({ case (ik, JString(iv)) => ik -> iv }).toMap }).toMap
@@ -170,4 +210,6 @@ trait AdvancedResponse extends RawResponse {
     val v = raw \ "moderation_status"
 	v.extractOpt[ModerationStatus.Value]
   }
+
+  lazy val pages:Int = (raw \ "pages").extractOpt[Int].getOrElse(1)
 }
