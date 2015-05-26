@@ -1,5 +1,8 @@
 import sbt._
 import Keys._
+import SonatypeKeys._
+
+sonatypeSettings
 
 organization := "com.cloudinary"
 

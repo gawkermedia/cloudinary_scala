@@ -210,6 +210,4 @@ trait AdvancedResponse extends RawResponse {
     val v = raw \ "moderation_status"
 	v.extractOpt[ModerationStatus.Value]
   }
-
-  lazy val pages:Int = (raw \ "pages").extractOpt[Int].getOrElse(1)
 }

@@ -28,7 +28,7 @@ case class Transformation(val transformations:List[Map[String, Any]] = List(Map[
 
 	protected def param(key:String, value:Any):Transformation = {
 	  val nl = transformations.last + (key -> value) 
-	  new Transformation(transformations.dropRight(1) :+ nl)
+	  new Transformation(transformations.dropRight(1) ++ List(nl))
 	}
 	
 	
@@ -116,13 +116,7 @@ case class Transformation(val transformations:List[Map[String, Any]] = List(Map[
 	 * Multiple modes can be applied.
 	 */
 	def angle(value:String*) = param("angle", value)
-	def a_(value:String*) = angle(value: _*)
-
-	/**
-	 * Adjust opacity to the given percentage.
-	 */
-	def opacity(value:Int) = param("opacity", value)
-	def o_(value:Int) = opacity(value)
+	def a_(value:String*) = param("angle", value)
 	
 	/**
 	 * Add a solid border around the image. 
@@ -282,7 +276,7 @@ case class Transformation(val transformations:List[Map[String, Any]] = List(Map[
 			"w", "width", "h", "height", "x", "x", "y", "y", "r", "radius", "d", "default_image", 
 			"g", "gravity", "cs", "color_space", "p", "prefix", "l", "overlay", "u", "underlay", 
 			"f", "fetch_format", "dn", "density", "pg", "page", "dl", "delay", "e", "effect", 
-			"bo", "border", "q", "quality", "c", "crop", "dpr", "dpr", "o", "opacity"
+			"bo", "border", "q", "quality", "c", "crop", "dpr", "dpr"
 		).grouped(2).map {
 		  p => p.head -> options.getOrElse(p.last, "")
 		}.filter(p => p._2 != "" && p._2 != null).toMap
