@@ -58,7 +58,7 @@ object HttpClient {
           if (r.isInstanceOf[RawResponse]) r.asInstanceOf[RawResponse].raw = j
           r
         } catch {
-          case e: MappingException => throw new MappingException(e.msg + "\nIn:\n" + j.toString)
+          case e: MappingException => throw new MappingException(s"${e.msg}\nextracting $mf from:\n$j")
         }
     }
 }
