@@ -1,30 +1,28 @@
 package com.cloudinary
 
 import java.io._
+import java.nio.charset.StandardCharsets
 
-import scala.concurrent.Future
-
+import com.cloudinary.parameters._
+import com.cloudinary.response._
+import com.ning.http.client.RequestBuilder
+import com.ning.http.client.multipart.{ByteArrayPart, FilePart, StringPart}
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 
-import com.ning.http.client.RequestBuilder
-import com.ning.http.multipart.ByteArrayPartSource
-import com.ning.http.multipart.FilePart
-import com.ning.http.multipart.StringPart
-
-import com.cloudinary.response._
-import com.cloudinary.parameters._
-
-import concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class Uploader(implicit val cloudinary: Cloudinary) {
+
+  private[cloudinary] val httpclient: HttpClient = new HttpClient
 
   def signRequestParams(params: Map[String, Any]) = {
     val paramsAndTimeStamp = params + ("timestamp" -> (System.currentTimeMillis() / 1000L).toLong.toString)
     cloudinary.signRequest(paramsAndTimeStamp)
   }
 
-  def createRequest(action: String, optionalParams: Map[String, Any], file: AnyRef, resourceType: String = "image", signed:Boolean = true) = {
+  def createRequest(action: String, optionalParams: Map[String, Any], file: AnyRef, resourceType: String = "image", signed: Boolean = true, requestTimeout: Option[Int] = None) = {
     val params = Util.definedMap(optionalParams)
 
     val processedParams = if (signed) signRequestParams(params) else params
@@ -33,6 +31,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
 
     val apiUrlBuilder = new RequestBuilder("POST")
     apiUrlBuilder.setUrl(apiUrl)
+    requestTimeout.map(timeout => apiUrlBuilder.setRequestTimeout(timeout)) //in milliseconds
 
     processedParams foreach {
       param =>
@@ -41,35 +40,36 @@ class Uploader(implicit val cloudinary: Cloudinary) {
           case list: Iterable[_] => list.foreach {
             v =>
               apiUrlBuilder.addBodyPart(
-                new StringPart(k + "[]", v.toString, "UTF-8"))
+                new StringPart(k + "[]", v.toString, StringPart.DEFAULT_CONTENT_TYPE, StandardCharsets.UTF_8))
           }
           case null =>
-          case _ => apiUrlBuilder.addBodyPart(new StringPart(k, v.toString, "UTF-8"))
+          case _ => apiUrlBuilder.addBodyPart(new StringPart(k, v.toString, StringPart.DEFAULT_CONTENT_TYPE, StandardCharsets.UTF_8))
         }
     }
 
     file match {
-      case baps:ByteArrayPartSource => apiUrlBuilder.addBodyPart(new FilePart("file", baps))
+      case baps: ByteArrayPart => apiUrlBuilder.addBodyPart(baps)
       case fp: FilePart => apiUrlBuilder.addBodyPart(fp)
       case f: File => apiUrlBuilder.addBodyPart(new FilePart("file", f))
       case fn: String if !fn.matches(illegalFileName) => apiUrlBuilder.addBodyPart(new FilePart("file", new File(fn)))
-      case body: String => apiUrlBuilder.addBodyPart(new StringPart("file", body, "UTF-8"))
-      case body: Array[Byte] => apiUrlBuilder.addBodyPart(new FilePart("file", new ByteArrayPartSource("file", body)))
+      case body: String => apiUrlBuilder.addBodyPart(new StringPart("file", body, StringPart.DEFAULT_CONTENT_TYPE, StandardCharsets.UTF_8))
+      case body: Array[Byte] => apiUrlBuilder.addBodyPart(new ByteArrayPart("file", body))
       case null =>
-      case _ => throw new IOException("Uprecognized file parameter " + file);
+      case _ => throw new IOException("Unrecognized file parameter " + file);
     }
 
     apiUrlBuilder.build()
   }
 
-  def callApi[T](action: String, optionalParams: Map[String, Any], file: AnyRef, resourceType: String = "image", signed:Boolean = true)(implicit mf: scala.reflect.Manifest[T]): Future[T] = {
-    val request = createRequest(action, optionalParams, file, resourceType, signed)
-    HttpClient.executeAndExtractResponse[T](request)
+  def callApi[T](action: String, optionalParams: Map[String, Any], file: AnyRef, resourceType: String = "image", signed: Boolean = true, requestTimeout: Option[Int] = None)
+                (implicit mf: scala.reflect.Manifest[T]): Future[T] = {
+    val request = createRequest(action, optionalParams, file, resourceType, signed, requestTimeout)
+    httpclient.executeAndExtractResponse[T](request)
   }
 
   def callRawApi(action: String, optionalParams: Map[String, Any], file: AnyRef, resourceType: String = "image") = {
     val request = createRequest(action, optionalParams, file, resourceType)
-    HttpClient.executeCloudinaryRequest(request)
+    httpclient.executeCloudinaryRequest(request)
   }
 
   def callTagsApi(tag: String, command: String, publicIds: Iterable[String], `type`: Option[String]) = {
@@ -81,36 +81,37 @@ class Uploader(implicit val cloudinary: Cloudinary) {
     callApi[TagResponse]("tags", params, null);
   }
 
-  def unsignedUpload(file: AnyRef, uploadPreset:String, params: UploadParameters = UploadParameters(), resourceType: String = "image") = {
-    upload(file, params.uploadPreset(uploadPreset).copy(signed = false), resourceType)
+  def unsignedUpload(file: AnyRef, uploadPreset: String, params: UploadParameters = UploadParameters(), resourceType: String = "image", requestTimeout: Option[Int] = None) = {
+    upload(file, params.uploadPreset(uploadPreset).copy(signed = false), resourceType, requestTimeout)
   }
 
-  def upload(file: AnyRef, params: UploadParameters = UploadParameters(), resourceType: String = "image") = {
-    callApi[UploadResponse]("upload", params.toMap, file, resourceType, params.signed)
+  def upload(file: AnyRef, params: UploadParameters = UploadParameters(), resourceType: String = "image", requestTimeout: Option[Int] = None) = {
+    callApi[UploadResponse]("upload", params.toMap, file, resourceType, params.signed, requestTimeout)
   }
 
   def uploadLargeRaw(file: AnyRef, params: LargeUploadParameters = LargeUploadParameters(), bufferSize: Int = 20000000) = {
     val (input, fileName) = file match {
       case s: String =>
-       	val f = new File(s)
+        val f = new File(s)
         (new FileInputStream(f), Some(f.getName))
       case f: File => (new FileInputStream(f), Some(f.getName))
       case b: Array[Byte] => (new ByteArrayInputStream(b), None)
       case is: InputStream => (is, None)
     }
     try {
-    	uploadLargeRawPart(input, params, fileName, bufferSize)
+      uploadLargeRawPart(input, params, fileName, bufferSize)
     } catch {
-      case e:Exception =>
+      case e: Exception =>
         input.close()
         throw e
     }
   }
 
-  private def uploadLargeRawPart(input: InputStream, params: LargeUploadParameters, originalFileName:Option[String], bufferSize: Int, partNumber: Int = 1): Future[LargeRawUploadResponse] = {
+  private def uploadLargeRawPart(input: InputStream, params: LargeUploadParameters, originalFileName: Option[String], bufferSize: Int, partNumber: Int = 1): Future[LargeRawUploadResponse] = {
     val uploadParams = params.toMap + ("part_number" -> partNumber.toString)
     val (last, buffer) = readChunck(input, bufferSize)
-    val part = new ByteArrayPartSource(originalFileName.getOrElse("file"), buffer)
+    val part = new ByteArrayPart("file", buffer)
+    part.setFileName(originalFileName.getOrElse("file"))
     (partNumber, last) match {
       case (_, true) =>
         input.close()
@@ -122,22 +123,22 @@ class Uploader(implicit val cloudinary: Cloudinary) {
         }
       case _ =>
         val responseFuture = callApi[LargeRawUploadResponse]("upload_large", uploadParams, part, "raw")
-        responseFuture.flatMap{
+        responseFuture.flatMap {
           response => uploadLargeRawPart(input, params, originalFileName, bufferSize, partNumber + 1)
         }
     }
   }
-  
+
   private def readChunck(input: InputStream, bufferSize: Int) = {
     val buffer = new Array[Byte](bufferSize)
     var bytesWritten = 0
     var bytesRead = 0
-    var loop = true 
+    var loop = true
     do {
-    	bytesRead = input.read(buffer, bytesWritten, bufferSize - bytesWritten)
-    	loop = (bytesRead != -1 && bytesRead + bytesWritten < bufferSize)
-    	bytesWritten = bytesWritten + math.max(bytesRead, 0)
-    } while(loop)
+      bytesRead = input.read(buffer, bytesWritten, bufferSize - bytesWritten)
+      loop = (bytesRead != -1 && bytesRead + bytesWritten < bufferSize)
+      bytesWritten = bytesWritten + math.max(bytesRead, 0)
+    } while (loop)
     (bytesRead == -1, buffer.take(bytesWritten))
   }
 
@@ -159,7 +160,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
   }
 
   def explicit(publicId: String, callback: Option[String] = None, `type`: Option[String] = None,
-    eager: List[Transformation] = List(), customHeaders: Map[String, String] = Map(), tags: Set[String] = Set(), faceCoordinates: List[FaceInfo] = List()) = {
+               eager: List[Transformation] = List(), customHeaders: Map[String, String] = Map(), tags: Set[String] = Set(), faceCoordinates: List[FaceInfo] = List()) = {
     val params = UploadParameters().publicId(publicId).`type`(`type`.getOrElse("")).eager(eager).
       headers(customHeaders).tags(tags).faceCoordinates(faceCoordinates).
       callback(callback.getOrElse(""))
@@ -167,7 +168,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
   }
 
   def generateSprite(tag: String, transformation: Option[Transformation] = None,
-    format: Option[String] = None, notificationUrl: Option[String] = None, async: Option[Boolean] = None) = {
+                     format: Option[String] = None, notificationUrl: Option[String] = None, async: Option[Boolean] = None) = {
 
     val formattedTransformation = format match {
       case Some(f: String) => transformation.map(_.fetchFormat(f))
@@ -183,7 +184,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
   }
 
   def multi(tag: String, transformation: Option[Transformation] = None,
-    format: Option[String] = None, notificationUrl: Option[String] = None, async: Option[Boolean] = None) = {
+            format: Option[String] = None, notificationUrl: Option[String] = None, async: Option[Boolean] = None) = {
     val params = Map(
       "transformation" -> transformation.map(_.generate()),
       "tag" -> tag,
@@ -194,7 +195,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
   }
 
   def explode(publicId: String, transformation: Option[Transformation] = None,
-    format: Option[String] = None, notificationUrl: Option[String] = None) = {
+              format: Option[String] = None, notificationUrl: Option[String] = None) = {
     val params = Map(
       "transformation" -> transformation.map(_.generate),
       "public_id" -> publicId,
@@ -224,7 +225,7 @@ class Uploader(implicit val cloudinary: Cloudinary) {
 
   private def escapeHtml(s: Any) = xml.Utility.escape(s.toString)
 
-  def unsignedImageUploadTag(field: String, preset:String, uploadParameters: UploadParameters = UploadParameters(), paramHtmlOptions: Map[String, Any] = Map(), resourceType: String = "image") = 
+  def unsignedImageUploadTag(field: String, preset: String, uploadParameters: UploadParameters = UploadParameters(), paramHtmlOptions: Map[String, Any] = Map(), resourceType: String = "image") =
     imageUploadTag(field, uploadParameters.uploadPreset(preset).copy(signed = false), paramHtmlOptions, resourceType)
 
   def imageUploadTag(field: String, uploadParameters: UploadParameters = UploadParameters(), paramHtmlOptions: Map[String, Any] = Map(), resourceType: String = "image") = {
@@ -232,7 +233,9 @@ class Uploader(implicit val cloudinary: Cloudinary) {
     val htmlOptionsString = htmlOptions
       .filterNot(p => p._2 == null || p._1 == "class")
       .mapValues(escapeHtml)
-      .map(p => { p._1 } + "=\"" + p._2 + "\"").mkString(" ")
+      .map(p => {
+        p._1
+      } + "=\"" + p._2 + "\"").mkString(" ")
     val classes = ("cloudinary-fileupload" :: htmlOptions.filter(_._1 == "class").values.toList).map(escapeHtml).mkString(" ")
     val tagParams = escapeHtml(uploadTagParams(uploadParameters.toMap, resourceType, uploadParameters.signed))
     val cloudinaryUploadUrl = cloudinary.cloudinaryApiUrl("upload", resourceType)
@@ -247,12 +250,12 @@ class Uploader(implicit val cloudinary: Cloudinary) {
 """
   }
 
-  protected def uploadTagParams(paramOptions: Map[String, Any] = Map(), resourceType: String = "image", signed:Boolean = true) = {
+  protected def uploadTagParams(paramOptions: Map[String, Any] = Map(), resourceType: String = "image", signed: Boolean = true) = {
     var options = paramOptions
 
     val callback = options.get("callback") match {
       case None => cloudinary.getStringConfig("callback")
-      case c @ _ => c
+      case c@_ => c
     }
     if (callback.isEmpty)
       throw new IllegalArgumentException("Must supply callback")

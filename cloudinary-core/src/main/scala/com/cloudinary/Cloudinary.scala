@@ -13,7 +13,7 @@ object Cloudinary {
   final val OLD_AKAMAI_SHARED_CDN = "cloudinary-a.akamaihd.net";
   final val AKAMAI_SHARED_CDN = "res.cloudinary.com";
   final val SHARED_CDN = AKAMAI_SHARED_CDN;
-  final val VERSION = "0.9.6.3"
+  final val VERSION = "1.2.1"
   final val USER_AGENT = s"cld-scala-$VERSION"
 
   def configFromUrl(cloudinaryUrl: String): Map[String, Any] = {
@@ -58,7 +58,6 @@ object Cloudinary {
     }
 
     val digest = sign(params.mkString("&"), apiSecret)
-    
     bytes2Hex(digest).toLowerCase()
   }
   
@@ -142,6 +141,8 @@ class Cloudinary(config: Map[String, Any]) {
 
   def api() = new Api()
 
+  def search() = new Search()
+
   def cloudinaryApiUrlPrefix(): String = {
     val cloudinary = Cloudinary.asString(config.get("upload_prefix"),
       Some("https://api.cloudinary.com")).get
@@ -192,7 +193,7 @@ class Cloudinary(config: Map[String, Any]) {
       .setUrl(cloudinaryApiUrl("download", resourceType))
 
     for (param <- params) {
-      builder.addParameter(param._1, param._2.toString())
+      builder.addQueryParam(param._1, param._2.toString())
     }
     builder.build()
   }
@@ -215,7 +216,7 @@ class Cloudinary(config: Map[String, Any]) {
       .setUrl(cloudinaryApiUrl("download_tag.zip", resourceType))
 
     for (param <- params) {
-      builder.addParameter(param._1, param._2.toString())
+      builder.addQueryParam(param._1, param._2.toString())
     }
     builder.build()
   }
