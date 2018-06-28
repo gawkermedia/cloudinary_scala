@@ -1,6 +1,6 @@
 name := "cloudinary-scala-play"
 
-organization := "com.cloudinary"
+organization := "com.kinja"
 
 version := Common.version
 
@@ -12,7 +12,7 @@ resolvers += "sonatype releases" at "https://oss.sonatype.org/content/repositori
 
 resolvers += Resolver.file("Local Ivy", file(Path.userHome + "/.ivy2/local"))(Resolver.ivyStylePatterns)
 
-libraryDependencies += "com.cloudinary" %% "cloudinary-core-scala" % version.value
+libraryDependencies += "com.kinja" %% "cloudinary-core-scala" % version.value
 
 pomExtra := {
   <url>http://cloudinary.com</url>

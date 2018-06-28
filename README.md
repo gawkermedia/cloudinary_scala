@@ -1,5 +1,25 @@
 [![Build Status](https://travis-ci.org/cloudinary/cloudinary_scala.svg)](https://travis-ci.org/cloudinary/cloudinary_scala)
 
+Kinja Custom Build
+==================
+
+This is a custom-built version of the Cloudinary Scala library. No changes are done in the logic, only a few dependencies
+are upgraded and cross-compilation is set up for Scala 2.11 and 2.12. This is no longer necessary as soon as Cloudinary
+releases a Scala 2.12 build.
+https://github.com/cloudinary/cloudinary_scala/pull/24
+https://github.com/cloudinary/cloudinary_scala/pull/27
+
+There's no Jenkins job for this project and we only need cloudinary_core so publish it to jFrog like this:
+
+```
+sbt> project cloudinaryCoreScala
+sbt> ++2.11.8
+sbt> publish
+sbt> ++2.12.6
+sbt> publish
+```
+
+
 Cloudinary
 ==========
 
