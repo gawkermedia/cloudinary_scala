@@ -192,9 +192,12 @@ class CloudinarySpec extends FlatSpec with Matchers with OptionValues with Insid
 
   }
 
-  it should "add version if public_id contains" in {
+  it should "not add version if public_id contains folder and version not defined" in {
     cloudinary.url().generate("folder/test") should equal(
-      "http://res.cloudinary.com/test123/image/upload/v1/folder/test")
+      "http://res.cloudinary.com/test123/image/upload/folder/test")
+  }
+
+  it should "add version if public_id contains folder and version defined" in {
     cloudinary.url().version(123).generate("folder/test") should equal(
       "http://res.cloudinary.com/test123/image/upload/v123/folder/test")
   }
@@ -202,6 +205,13 @@ class CloudinarySpec extends FlatSpec with Matchers with OptionValues with Insid
   it should "not add version if public_id contains version already" in {
     cloudinary.url().generate("v123/test") should equal(
       "http://res.cloudinary.com/test123/image/upload/v123/test")
+    cloudinary.url().generate("v123/folder/test") should equal(
+      "http://res.cloudinary.com/test123/image/upload/v123/folder/test")
+  }
+
+  it should "not add version if public_id not contains folder and version not defined" in {
+    cloudinary.url().generate("test") should equal(
+      "http://res.cloudinary.com/test123/image/upload/test")
   }
 
   it should "allow to shorten image/upload urls" in {
