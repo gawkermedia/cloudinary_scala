@@ -317,13 +317,13 @@ class UploaderSpec extends MockableFlatSpec with Matchers with OptionValues with
   }
 
   it should "support unsigned uploading using presets" taggedAs(UploadPresetTest) in {
-    val c = cloudinary.withConfig(Map("api_key" -> null, "api_secret" -> null)) 
+    val c = cloudinary.withConfig(Map("api_key" -> null, "api_secret" -> null))
     val (presetName, uploadResult) = Await.result(for {
-      preset <- c.api.createUploadPreset(UploadPreset(unsigned = true, settings = options.folder("upload_folder")))
+      preset <- api.createUploadPreset(UploadPreset(unsigned = true, settings = options.folder("upload_folder")))
       result <- c.uploader.unsignedUpload(s"$testResourcePath/logo.png", preset.name)
     } yield (preset.name, result), 10.seconds)
     uploadResult.public_id should fullyMatch regex "upload_folder/[a-z0-9]+"
-    Await.result(c.api.deleteUploadPreset(presetName), 5.seconds)
+    Await.result(api.deleteUploadPreset(presetName), 5.seconds)
   }
 
   it should "support uploading with eager async transformations" taggedAs(EagerTest) in {

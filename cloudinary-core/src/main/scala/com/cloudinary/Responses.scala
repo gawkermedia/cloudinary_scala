@@ -20,7 +20,7 @@ case class TransformationInfo(name: String, allowed_for_strict: Boolean, used: B
 case class UploadPreset(name:String = null, unsigned:Boolean = false, settings:UploadParameters) {
   def toMap = settings.toMap + ("name" -> name) + ("unsigned" -> unsigned.toString())
 }
-case class UnparsedUploadPreset(name:String, unsigned:Boolean, settings:Map[String,String])
+case class UnparsedUploadPreset(name:String, unsigned:Boolean, settings:Map[String,Any])
 
 object ModerationStatus extends Enumeration {
   type ModerationStatus = Value

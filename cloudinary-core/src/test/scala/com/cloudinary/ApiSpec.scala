@@ -435,8 +435,10 @@ class ApiSpec extends MockableFlatSpec with Matchers with OptionValues with Insi
       uploadResult <- uploader.upload(s"$testResourcePath/logo.png")
       response <- cloudinary.api.update(uploadResult.public_id, UpdateParameters().autoTagging(0.5))
     } yield {
-      println(response)
-      response should equal(null)
+      response.bytes should equal(new java.io.File(s"$testResourcePath/logo.png").length())
+      response.resource_type should equal("image")
+      response.format should equal("png")
+      response.`type` should  equal("upload")
     }, 10.seconds)
   }
 
