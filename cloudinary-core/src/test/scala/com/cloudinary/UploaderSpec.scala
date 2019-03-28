@@ -145,7 +145,7 @@ class UploaderSpec extends MockableFlatSpec with Matchers with OptionValues with
     val Some(url) = result.eager.headOption.map(_.url)
     var expectedUrl = cloudinary.url().`type`("twitter_name")
       .transformation(new Transformation().crop("scale").width(2.0))
-      .format("png").version(result.version).generate("cloudinary")
+      .format("jpg").version(result.version).generate("cloudinary")
     if (!cloudinary.cloudinaryApiUrlPrefix().startsWith("https://api.cloudinary.com")) {
       expectedUrl = expectedUrl.replaceFirst("http://res\\.cloudinary\\.com", "/res")
     }
@@ -280,28 +280,30 @@ class UploaderSpec extends MockableFlatSpec with Matchers with OptionValues with
     val error = Await.result(for {
       e <- uploader.upload(s"$testResourcePath/docx.docx", options.rawConvert("illegal"), "raw").recover{case e => e}
     } yield e, 10.seconds)
-    error.asInstanceOf[BadRequest].message should include("not a valid")
+    error.asInstanceOf[BadRequest].message should include("is invalid")
   }
   
   it should "support requesting categorization" in {
     val error = Await.result(for {
       e <- uploader.upload(s"$testResourcePath/logo.png", options.categorization("illegal")).recover{case e => e}
     } yield e, 10.seconds)
-    error.asInstanceOf[BadRequest].message should include("is invalid")
+    error.asInstanceOf[BadRequest].message should include("is not valid")
   }
   
   it should "support requesting detection" in {
     val error = Await.result(for {
       e <- uploader.upload(s"$testResourcePath/logo.png", options.detection("illegal")).recover{case e => e}
     } yield e, 10.seconds)
-    error.asInstanceOf[BadRequest].message should include("not a valid")
+    error.asInstanceOf[BadRequest].message should include("is invalid")
   }
     
   it should "support requesting auto_tagging" in {
-    val error = Await.result(for {
-      e <- uploader.upload(s"$testResourcePath/logo.png", options.autoTagging(0.5)).recover{case e => e}
-    } yield e, 10.seconds)
-    error.asInstanceOf[BadRequest].message should include("Must use")
+    Await.result(for {
+      response <- uploader.upload(s"$testResourcePath/logo.png", options.autoTagging(0.5))
+    } yield {
+      response.bytes should equal (new java.io.File(s"$testResourcePath/logo.png").length())
+      response.resource_type should equal("image")
+    }, 10.seconds)
   }
   
   it should "support uploading large raw files" in {
@@ -315,10 +317,10 @@ class UploaderSpec extends MockableFlatSpec with Matchers with OptionValues with
   }
 
   it should "support unsigned uploading using presets" taggedAs(UploadPresetTest) in {
-    val c = cloudinary.withConfig(Map("api_key" -> null, "api_secret" -> null)) 
+    val c = cloudinary.withConfig(Map("api_key" -> null, "api_secret" -> null))
     val (presetName, uploadResult) = Await.result(for {
       preset <- api.createUploadPreset(UploadPreset(unsigned = true, settings = options.folder("upload_folder")))
-      result <- uploader.unsignedUpload(s"$testResourcePath/logo.png", preset.name)
+      result <- c.uploader.unsignedUpload(s"$testResourcePath/logo.png", preset.name)
     } yield (preset.name, result), 10.seconds)
     uploadResult.public_id should fullyMatch regex "upload_folder/[a-z0-9]+"
     Await.result(api.deleteUploadPreset(presetName), 5.seconds)

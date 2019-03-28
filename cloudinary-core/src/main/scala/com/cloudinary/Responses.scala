@@ -13,14 +13,14 @@ case class CustomCoordinate(x: Int, y: Int, width: Int, height: Int)
 case class EagerInfo(url: String, secure_url: String)
 case class ColorInfo(color: String, rank: Double)
 case class SpriteImageInfo(x: Int, y: Int, width: Int, height: Int)
-case class UsageInfo(usage: Int, limit: Int, used_percent: Float)
+case class UsageInfo(usage: Int, limit: Option[Int], used_percent: Option[Float], credit_usage: Option[Double])
 case class DerivedInfo(public_id: String, format: String, bytes: Long, id: String, url: String, secure_url: String)
 case class DerivedTransformInfo(transformation: String, format: String, bytes: Long, id: String, url: String, secure_url: String)
 case class TransformationInfo(name: String, allowed_for_strict: Boolean, used: Boolean)
 case class UploadPreset(name:String = null, unsigned:Boolean = false, settings:UploadParameters) {
   def toMap = settings.toMap + ("name" -> name) + ("unsigned" -> unsigned.toString())
 }
-case class UnparsedUploadPreset(name:String, unsigned:Boolean, settings:Map[String,String])
+case class UnparsedUploadPreset(name:String, unsigned:Boolean, settings:Map[String,Any])
 
 object ModerationStatus extends Enumeration {
   type ModerationStatus = Value
