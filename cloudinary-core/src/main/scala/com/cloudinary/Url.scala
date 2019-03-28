@@ -144,10 +144,7 @@ case class Url(
     }
     val prefix = getPrefix(source)
 
-    val version = (if (source.contains("/") && 
-                      !source.matches("v[0-9]+.*") && 
-                      !source.matches("https?:/.*") && 
-                      this.version.isEmpty) Some("1") else this.version).map("v" + _)
+    val version = this.version.map("v" + _)
 
     val (finalSource, signableSource) = finalizeSource(source)
 
