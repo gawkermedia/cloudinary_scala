@@ -35,15 +35,16 @@ pomExtra := {
 }  
   
 libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %% "scala-xml" % "1.2.0",
   "com.ning" % "async-http-client" % "1.9.40",
-  "org.json4s" %% "json4s-native" % "3.5.3",
-  "org.json4s" %% "json4s-ext" % "3.5.3",
-  "org.scalatest" %% "scalatest" % "3.0.4" % "test",
+  "org.json4s" %% "json4s-native" % "3.6.7",
+  "org.json4s" %% "json4s-ext" % "3.6.7",
+  "org.scalatest" %% "scalatest" % "3.0.8" % "test",
   "org.nanohttpd" % "nanohttpd" % "2.3.1" % "test")
 
 // http://mvnrepository.com/artifact/org.slf4j/slf4j-simple
 libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.25" % "test"
-libraryDependencies += "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0" % "test"
+libraryDependencies += "org.scalamock" %% "scalamock" % "4.3.0" % "test"
 resolvers ++= Seq("sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots", "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases")
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")

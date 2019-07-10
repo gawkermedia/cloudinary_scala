@@ -244,7 +244,7 @@ class Api(implicit cloudinary: Cloudinary) {
 
   def updateUploadPreset(uploadPreset: UploadPreset) = {
     callApi[UploadPresetUpdateResponse](Api.PUT, "upload_presets" :: uploadPreset.name :: Nil,
-      uploadPreset.toMap.filterKeys{_ != "name"})
+      uploadPreset.toMap.filter{ case (key, _) => key != "name"})
   }
 
   def rootFolders() = callApi[FolderListResponse](Api.GET, "folders" :: Nil, Map())
